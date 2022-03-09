@@ -178,7 +178,11 @@ export class BehaviorRouter {
 						}
 					}
 
-					res.end(response.body);
+					if (response.bodyEncoding === 'base64' && response.body) {
+						res.end(Buffer.from(response.body, 'base64'));
+					} else {
+						res.end(response.body);
+					}
 				} catch (err) {
 					this.handleError(err, res);
 					return;

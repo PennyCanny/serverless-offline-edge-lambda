@@ -5,6 +5,7 @@ import * as https from 'https';
 import * as path from 'path';
 
 import { parse } from 'url';
+import mime from 'mime';
 import { toHttpHeaders } from '../utils';
 import { OutgoingHttpHeaders } from 'http';
 import { InternalServerError, NotFoundError } from '../errors/http';
@@ -35,12 +36,15 @@ export class Origin {
 		try {
 			const contents = await this.getResource(request);
 
+			const fileName = parse(request.uri).pathname;
+			const mimeType = mime.getType(fileName || 'js') || 'application/json';
+
 			return {
 				status: '200',
 				statusDescription: 'OK',
 				headers: {
 					'content-type': [
-						{ key: 'content-type', value: 'application/json' }
+						{ key: 'content-type', value: mimeType }
 					]
 				},
 				bodyEncoding: 'text',
@@ -93,6 +97,8 @@ export class Origin {
 
 		const fileTarget = `${this.baseUrl}/${fileName}`;
 
+		const mimeType = mime.getType(fileName || 'js') || 'application/json';
+
 		// Check for if path given is accessible and is a file before fetching it
 		try {
 			await fs.access(fileTarget);
@@ -105,7 +111,7 @@ export class Origin {
 			throw new NotFoundError(`${fileTarget} is not a file.`);
 		}
 
-		return await fs.readFile(`${this.baseUrl}/${fileName}`, 'utf-8');
+		return fs.readFile(`${this.baseUrl}/${fileName}`, mimeType.startsWith('image/') ? 'base64' : 'utf-8');
 	}
 
 	private async getHttpResource(request: CloudFrontRequest): Promise<string> {
