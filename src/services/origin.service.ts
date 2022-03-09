@@ -47,7 +47,7 @@ export class Origin {
 						{ key: 'content-type', value: mimeType }
 					]
 				},
-				bodyEncoding: 'text',
+				bodyEncoding: mimeType.startsWith('image/') ? 'base64' : 'text',
 				body: contents
 			};
 		} catch (err) {
