@@ -192,7 +192,7 @@ export class BehaviorRouter {
 
 
 			return new Promise(resolve => {
-				const { https: useHttps, cert, key, ca } = this.serverless.service.custom;
+				const { https: useHttps, cert, key, ca } = this.serverless.service.custom.offlineEdgeLambda.server;
 
 				if (useHttps) {
 					const options: https.ServerOptions = {
