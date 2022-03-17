@@ -3,7 +3,8 @@ import bodyParser from 'body-parser';
 import connect, { HandleFunction } from 'connect';
 import cookieParser from 'cookie-parser';
 import * as fs from 'fs-extra';
-import { createServer, Server, IncomingMessage, ServerResponse } from 'http';
+import http from 'http';
+import https from 'https';
 import { StatusCodes } from 'http-status-codes';
 import * as os from 'os';
 import * as path from 'path';
@@ -39,7 +40,7 @@ export class BehaviorRouter {
 	private started: boolean = false;
 	private origins: Map<string, Origin>;
 	private restarting: boolean = false;
-	private server: Server | null = null;
+	private server: http.Server | null = null;
 	private cacheService: CacheService;
 	private log: (message: string) => void;
 
@@ -64,7 +65,7 @@ export class BehaviorRouter {
 		this.cacheService = new CacheService(this.cacheDir);
 	}
 
-	match(req: IncomingMessage): FunctionSet | null {
+	match(req: http.IncomingMessage): FunctionSet | null {
 		if (!req.url) {
 			return null;
 		}
@@ -135,7 +136,7 @@ export class BehaviorRouter {
 			app.use(cloudfrontPost());
 			app.use(bodyParser());
 			app.use(cookieParser() as HandleFunction);
-			app.use(asyncMiddleware(async (req: IncomingMessageWithBodyAndCookies, res: ServerResponse) => {
+			app.use(asyncMiddleware(async (req: IncomingMessageWithBodyAndCookies, res: http.ServerResponse) => {
 				if ((req.method || '').toUpperCase() === 'PURGE') {
 					await this.purgeStorage();
 
@@ -191,7 +192,23 @@ export class BehaviorRouter {
 
 
 			return new Promise(resolve => {
-				this.server = createServer(app);
+				const { https: useHttps, cert, key, ca } = this.serverless.service.custom;
+
+				if (useHttps) {
+					const options: https.ServerOptions = {
+						cert: fs.readFileSync(path.resolve(cert), 'utf8'),
+						key: fs.readFileSync(path.resolve(key), 'utf8'),
+					};
+
+					if (ca) {
+						options.ca = [fs.readFileSync(path.resolve(ca), 'utf8')];
+					}
+
+					this.server = https.createServer(options, app);
+				} else {
+					this.server = http.createServer(app);
+				}
+
 				this.server.listen(port);
 				this.server.on('close', (e: string) => {
 					resolve(e);
@@ -204,7 +221,7 @@ export class BehaviorRouter {
 	}
 
 	// Format errors
-	public handleError(err: HttpError, res: ServerResponse) {
+	public handleError(err: HttpError, res: http.ServerResponse) {
 		res.statusCode = err.statusCode || StatusCodes.INTERNAL_SERVER_ERROR;
 
 		const payload = JSON.stringify(err.hasOwnProperty('getResponsePayload') ?
